@@ -1,0 +1,821 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LogoRush — Guess the Brand</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #12121a;
+    --surface2: #1a1a26;
+    --border: #2a2a3d;
+    --accent: #f0c040;
+    --accent2: #ff4f6d;
+    --accent3: #4fffb0;
+    --text: #f0f0f0;
+    --muted: #6a6a8a;
+    --player1: #4fffb0;
+    --player2: #ff4f6d;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:var(--bg); color:var(--text); font-family:'DM Sans',sans-serif; min-height:100vh; overflow-x:hidden; }
+  
+  /* ── SHARED ── */
+  .screen { display:none; min-height:100vh; }
+  .screen.active { display:flex; flex-direction:column; }
+  .btn { cursor:pointer; border:none; font-family:'DM Sans',sans-serif; font-weight:700; letter-spacing:.04em; transition:all .18s; }
+  .btn-primary { background:var(--accent); color:#0a0a0f; padding:14px 36px; font-size:1rem; clip-path:polygon(8px 0,100% 0,calc(100% - 8px) 100%,0 100%); }
+  .btn-primary:hover { background:#fff; transform:translateY(-2px); box-shadow:0 8px 24px rgba(240,192,64,.35); }
+  .btn-danger { background:var(--accent2); color:#fff; padding:10px 24px; font-size:.9rem; border-radius:4px; }
+  .btn-danger:hover { filter:brightness(1.2); }
+  .btn-ghost { background:transparent; color:var(--muted); padding:10px 24px; font-size:.9rem; border:1px solid var(--border); border-radius:4px; }
+  .btn-ghost:hover { border-color:var(--accent); color:var(--accent); }
+  .tag { display:inline-block; font-family:'Space Mono',monospace; font-size:.7rem; padding:4px 10px; border-radius:2px; letter-spacing:.1em; }
+  .tag-green { background:rgba(79,255,176,.12); color:var(--accent3); border:1px solid rgba(79,255,176,.25); }
+  .tag-red { background:rgba(255,79,109,.12); color:var(--accent2); border:1px solid rgba(255,79,109,.25); }
+  .tag-yellow { background:rgba(240,192,64,.12); color:var(--accent); border:1px solid rgba(240,192,64,.25); }
+
+  /* noise grain */
+  body::before { content:''; position:fixed; inset:0; background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.04'/%3E%3C/svg%3E"); pointer-events:none; z-index:9999; opacity:.45; }
+
+  /* ══════════ HOME ══════════ */
+  #home { align-items:center; justify-content:center; position:relative; }
+  .home-bg { position:absolute; inset:0; overflow:hidden; }
+  .home-bg span { position:absolute; font-size:11vw; opacity:.04; font-family:'Bebas Neue'; animation:drift 18s infinite linear; }
+  .home-bg span:nth-child(1){top:5%;left:2%;animation-duration:22s;}
+  .home-bg span:nth-child(2){top:35%;right:3%;animation-duration:16s;animation-direction:reverse;}
+  .home-bg span:nth-child(3){bottom:10%;left:20%;animation-duration:26s;}
+  @keyframes drift { 0%,100%{transform:translateY(0) rotate(-3deg)} 50%{transform:translateY(-30px) rotate(3deg)} }
+  .home-inner { position:relative; text-align:center; max-width:520px; padding:40px 20px; }
+  .logo-mark { font-family:'Bebas Neue'; font-size:5rem; color:var(--accent); letter-spacing:.06em; line-height:1; }
+  .logo-mark span { color:var(--accent2); }
+  .home-tagline { color:var(--muted); font-size:1rem; margin:12px 0 40px; letter-spacing:.06em; text-transform:uppercase; font-size:.85rem; }
+  .home-form { display:flex; flex-direction:column; gap:14px; align-items:center; width:100%; }
+  .home-form input { width:100%; max-width:340px; padding:14px 20px; background:var(--surface); border:1px solid var(--border); color:var(--text); font-size:1rem; font-family:'DM Sans',sans-serif; border-radius:4px; outline:none; transition:border-color .2s; }
+  .home-form input:focus { border-color:var(--accent); }
+  .home-modes { display:flex; gap:12px; margin-top:8px; }
+  .mode-card { padding:14px 20px; background:var(--surface); border:1px solid var(--border); border-radius:8px; cursor:pointer; transition:all .2s; text-align:center; min-width:120px; }
+  .mode-card:hover, .mode-card.selected { border-color:var(--accent); background:rgba(240,192,64,.08); }
+  .mode-card .mode-icon { font-size:1.8rem; display:block; margin-bottom:6px; }
+  .mode-card .mode-name { font-size:.85rem; font-weight:600; }
+  .mode-card .mode-desc { font-size:.72rem; color:var(--muted); margin-top:4px; }
+
+  /* ══════════ GENRE ══════════ */
+  #genre { align-items:center; justify-content:center; }
+  .genre-inner { max-width:640px; width:100%; padding:40px 20px; }
+  .section-title { font-family:'Bebas Neue'; font-size:2.8rem; letter-spacing:.06em; margin-bottom:8px; }
+  .section-sub { color:var(--muted); font-size:.9rem; margin-bottom:32px; }
+  .genre-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
+  .genre-card { padding:22px 14px; background:var(--surface); border:1px solid var(--border); border-radius:8px; cursor:pointer; transition:all .2s; text-align:center; position:relative; overflow:hidden; }
+  .genre-card::before { content:''; position:absolute; inset:0; background:linear-gradient(135deg, transparent 40%, rgba(255,255,255,.03)); }
+  .genre-card:hover { transform:translateY(-3px); border-color:var(--accent); }
+  .genre-card.selected { border-color:var(--accent); background:rgba(240,192,64,.1); }
+  .genre-card.locked { opacity:.4; cursor:not-allowed; }
+  .genre-card.locked:hover { transform:none; border-color:var(--border); }
+  .genre-icon { font-size:2.2rem; display:block; margin-bottom:8px; }
+  .genre-name { font-weight:700; font-size:.95rem; }
+  .genre-count { font-size:.75rem; color:var(--muted); margin-top:4px; }
+  .genre-lock { position:absolute; top:8px; right:8px; font-size:.75rem; }
+  .genre-actions { display:flex; justify-content:space-between; align-items:center; margin-top:28px; }
+  .genre-status { font-size:.85rem; color:var(--muted); }
+  .genre-status strong { color:var(--accent); }
+
+  /* ══════════ MATCHMAKING ══════════ */
+  #matchmaking { align-items:center; justify-content:center; }
+  .mm-inner { text-align:center; max-width:420px; padding:40px 20px; }
+  .mm-spinner { width:80px; height:80px; border:3px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin .9s linear infinite; margin:0 auto 28px; }
+  @keyframes spin { to{transform:rotate(360deg)} }
+  .mm-title { font-family:'Bebas Neue'; font-size:2.4rem; letter-spacing:.06em; margin-bottom:8px; }
+  .mm-sub { color:var(--muted); font-size:.9rem; }
+  .mm-timer { font-family:'Space Mono',monospace; font-size:2.5rem; color:var(--accent); margin:20px 0; }
+  .mm-bot-hint { margin-top:24px; padding:14px 20px; background:var(--surface); border:1px solid var(--border); border-radius:8px; font-size:.85rem; color:var(--muted); }
+  .mm-bot-hint strong { color:var(--text); }
+  .mm-players { display:flex; gap:16px; align-items:center; justify-content:center; margin:24px 0; }
+  .mm-player { padding:12px 20px; background:var(--surface); border:1px solid var(--border); border-radius:8px; font-weight:600; }
+  .mm-vs { font-family:'Bebas Neue'; font-size:1.6rem; color:var(--muted); }
+
+  /* ══════════ VERSUS SPLASH ══════════ */
+  #versus { align-items:center; justify-content:center; background:var(--bg); }
+  .vs-inner { text-align:center; animation:vsIn .5s ease-out; }
+  @keyframes vsIn { from{opacity:0;transform:scale(.9)} to{opacity:1;transform:scale(1)} }
+  .vs-genre-badge { font-size:.8rem; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); margin-bottom:24px; font-family:'Space Mono',monospace; }
+  .vs-players { display:flex; align-items:center; gap:32px; margin:24px 0; }
+  .vs-player-card { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:28px 40px; min-width:160px; }
+  .vs-player-card.p1 { border-color:var(--player1); box-shadow:0 0 30px rgba(79,255,176,.15); }
+  .vs-player-card.p2 { border-color:var(--player2); box-shadow:0 0 30px rgba(255,79,109,.15); }
+  .vs-avatar { font-size:3rem; margin-bottom:10px; }
+  .vs-pname { font-family:'Bebas Neue'; font-size:1.8rem; letter-spacing:.05em; }
+  .vs-badge { font-size:.72rem; margin-top:6px; }
+  .vs-big { font-family:'Bebas Neue'; font-size:6rem; color:var(--accent); letter-spacing:.1em; animation:pulse 1s ease-in-out infinite alternate; }
+  @keyframes pulse { from{transform:scale(1)} to{transform:scale(1.12)} }
+  .vs-countdown { font-family:'Space Mono',monospace; font-size:1.1rem; color:var(--muted); margin-top:16px; }
+
+  /* ══════════ GAME ══════════ */
+  #game { flex-direction:column; min-height:100vh; }
+  .game-header { display:flex; align-items:center; justify-content:space-between; padding:14px 24px; background:var(--surface); border-bottom:1px solid var(--border); }
+  .game-players { display:flex; align-items:center; gap:20px; }
+  .gp { display:flex; flex-direction:column; gap:2px; }
+  .gp-name { font-weight:700; font-size:.95rem; }
+  .gp-name.p1 { color:var(--player1); }
+  .gp-name.p2 { color:var(--player2); }
+  .gp-status { font-size:.72rem; color:var(--muted); font-family:'Space Mono',monospace; }
+  .game-center-info { text-align:center; }
+  .genre-label { font-size:.72rem; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); font-family:'Space Mono',monospace; }
+  .round-label { font-family:'Bebas Neue'; font-size:1.4rem; letter-spacing:.06em; }
+  .game-timer-zone { text-align:right; }
+  .timer-bar-wrap { width:120px; height:6px; background:var(--border); border-radius:3px; overflow:hidden; margin-bottom:4px; }
+  .timer-bar { height:100%; background:var(--accent); border-radius:3px; transition:width .5s linear, background .5s; }
+  .timer-val { font-family:'Space Mono',monospace; font-size:1.4rem; font-weight:700; color:var(--accent); }
+  .timer-val.urgent { color:var(--accent2); animation:blink .5s step-start infinite; }
+  @keyframes blink { 50%{opacity:.3} }
+
+  .game-body { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:24px 20px; gap:24px; }
+  .logo-display { background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:48px 64px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px; position:relative; overflow:hidden; min-width:320px; min-height:220px; }
+  .logo-display::before { content:''; position:absolute; inset:0; background:radial-gradient(ellipse at 50% 30%, rgba(240,192,64,.06) 0%, transparent 70%); }
+  .logo-svg { font-size:4.5rem; position:relative; z-index:1; filter:drop-shadow(0 4px 24px rgba(0,0,0,.5)); }
+  .logo-genre-tag { position:absolute; top:12px; right:12px; }
+  .logo-pass-count { position:absolute; top:12px; left:12px; font-size:.75rem; color:var(--muted); font-family:'Space Mono',monospace; }
+  .logo-text-render { font-size:3.5rem; font-weight:900; letter-spacing:-.02em; position:relative; z-index:1; }
+
+  .guess-zone { width:100%; max-width:480px; }
+  .guess-input-wrap { display:flex; gap:10px; }
+  .guess-input { flex:1; padding:16px 20px; background:var(--surface); border:2px solid var(--border); color:var(--text); font-size:1.05rem; font-family:'DM Sans',sans-serif; border-radius:8px; outline:none; transition:border-color .2s; }
+  .guess-input:focus { border-color:var(--accent); }
+  .guess-input.correct { border-color:var(--accent3); background:rgba(79,255,176,.07); }
+  .guess-input.wrong { border-color:var(--accent2); background:rgba(255,79,109,.07); animation:shake .35s; }
+  @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-8px)} 75%{transform:translateX(8px)} }
+  .btn-submit { background:var(--accent); color:#0a0a0f; padding:14px 24px; font-size:.95rem; font-weight:700; border-radius:8px; border:none; cursor:pointer; transition:all .2s; white-space:nowrap; }
+  .btn-submit:hover { filter:brightness(1.1); transform:translateY(-1px); }
+  .guess-actions { display:flex; gap:10px; margin-top:10px; align-items:center; justify-content:space-between; }
+  .btn-pass { background:var(--surface2); color:var(--muted); padding:10px 18px; font-size:.85rem; font-weight:600; border:1px solid var(--border); border-radius:6px; cursor:pointer; transition:all .2s; font-family:'DM Sans',sans-serif; }
+  .btn-pass:hover:not(:disabled) { border-color:var(--accent); color:var(--accent); }
+  .btn-pass:disabled { opacity:.35; cursor:not-allowed; }
+  .hint-text { font-size:.8rem; color:var(--muted); font-family:'Space Mono',monospace; }
+
+  .opponent-status { display:flex; align-items:center; gap:10px; background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:10px 18px; font-size:.85rem; }
+  .opp-dot { width:8px; height:8px; border-radius:50%; background:var(--accent2); animation:oppdot 1.2s ease-in-out infinite; }
+  @keyframes oppdot { 0%,100%{opacity:1} 50%{opacity:.3} }
+  .opp-dot.typing { background:var(--accent3); }
+
+  .score-board { display:flex; gap:20px; }
+  .score-item { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:10px 20px; text-align:center; }
+  .score-num { font-family:'Bebas Neue'; font-size:2rem; line-height:1; }
+  .score-num.p1 { color:var(--player1); }
+  .score-num.p2 { color:var(--player2); }
+  .score-lbl { font-size:.7rem; color:var(--muted); text-transform:uppercase; letter-spacing:.08em; margin-top:2px; }
+
+  /* ══════════ RESULT ══════════ */
+  #result { align-items:center; justify-content:center; }
+  .result-inner { text-align:center; max-width:480px; padding:40px 20px; }
+  .result-crown { font-size:4rem; animation:float 2.5s ease-in-out infinite; }
+  @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-12px)} }
+  .result-title { font-family:'Bebas Neue'; font-size:4rem; letter-spacing:.08em; line-height:1.1; }
+  .result-winner { color:var(--accent); }
+  .result-loser { color:var(--accent2); }
+  .result-reason { color:var(--muted); font-size:.9rem; margin:12px 0 28px; }
+  .result-scores { display:flex; gap:16px; justify-content:center; margin:24px 0; }
+  .rs-card { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:20px 32px; }
+  .rs-name { font-size:.8rem; color:var(--muted); text-transform:uppercase; letter-spacing:.08em; margin-bottom:6px; }
+  .rs-score { font-family:'Bebas Neue'; font-size:3rem; }
+  .rs-score.p1 { color:var(--player1); }
+  .rs-score.p2 { color:var(--player2); }
+  .result-actions { display:flex; gap:12px; justify-content:center; flex-wrap:wrap; }
+
+  /* ══════════ BOT PERSONALITY BADGE ══════════ */
+  .bot-badge { display:inline-flex; align-items:center; gap:6px; padding:6px 14px; border-radius:20px; font-size:.78rem; font-weight:600; }
+  .bot-easy { background:rgba(79,255,176,.15); color:var(--accent3); border:1px solid rgba(79,255,176,.3); }
+  .bot-medium { background:rgba(240,192,64,.15); color:var(--accent); border:1px solid rgba(240,192,64,.3); }
+  .bot-hard { background:rgba(255,79,109,.15); color:var(--accent2); border:1px solid rgba(255,79,109,.3); }
+  
+  /* ══════════ OVERLAY EFFECTS ══════════ */
+  .correct-flash { position:fixed; inset:0; background:rgba(79,255,176,.12); pointer-events:none; animation:flash .4s forwards; z-index:100; }
+  .wrong-flash { position:fixed; inset:0; background:rgba(255,79,109,.12); pointer-events:none; animation:flash .4s forwards; z-index:100; }
+  @keyframes flash { 0%{opacity:1} 100%{opacity:0} }
+  .toast { position:fixed; top:80px; left:50%; transform:translateX(-50%); background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:12px 24px; font-weight:600; z-index:200; animation:toastin .25s ease-out, toastout .3s ease-in 1.8s forwards; white-space:nowrap; }
+  .toast.success { border-color:var(--accent3); color:var(--accent3); }
+  .toast.error { border-color:var(--accent2); color:var(--accent2); }
+  .toast.info { border-color:var(--accent); color:var(--accent); }
+  @keyframes toastin { from{opacity:0;transform:translate(-50%,-10px)} to{opacity:1;transform:translate(-50%,0)} }
+  @keyframes toastout { to{opacity:0;transform:translate(-50%,-10px)} }
+
+  /* ══════════ LOBBY HINT ══════════ */
+  .lobby-info { background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:16px 20px; font-size:.83rem; color:var(--muted); line-height:1.7; }
+  .lobby-info strong { color:var(--text); }
+  .lobby-info span { color:var(--accent); }
+
+  @media(max-width:600px){
+    .genre-grid{grid-template-columns:repeat(2,1fr);}
+    .vs-players{flex-direction:column;gap:12px;}
+    .vs-big{font-size:4rem;}
+    .game-header{flex-direction:column;gap:10px;align-items:flex-start;}
+    .logo-display{padding:32px 24px;min-width:280px;}
+  }
+</style>
+</head>
+<body>
+
+<!-- ══ HOME ══ -->
+<div id="home" class="screen active">
+  <div class="home-bg">
+    <span>NIKE</span><span>APPLE</span><span>SONY</span>
+  </div>
+  <div class="home-inner">
+    <div class="logo-mark">Logo<span>Rush</span></div>
+    <p class="home-tagline">Can you guess the brand faster?</p>
+    <div class="home-form">
+      <input type="text" id="playerNameInput" placeholder="Enter your username…" maxlength="18" autocomplete="off"/>
+      <div class="lobby-info">
+        <strong>🎮 How it works:</strong><br>
+        <span>Pick a genre</span> → Match with opponent → <span>Guess logos</span> faster than them!<br>
+        ⏱ Each player has <strong>60 seconds</strong> · 🎲 1 Pass available · ❌ Time out = Lose
+      </div>
+      <div style="width:100%;max-width:340px">
+        <p style="font-size:.8rem;color:var(--muted);margin-bottom:10px;text-align:left;">Mode</p>
+        <div class="home-modes">
+          <div class="mode-card selected" id="modeOnline" onclick="selectMode('online')">
+            <span class="mode-icon">🌐</span>
+            <div class="mode-name">Online</div>
+            <div class="mode-desc">vs real player</div>
+          </div>
+          <div class="mode-card" id="modeBot" onclick="selectMode('bot')">
+            <span class="mode-icon">🤖</span>
+            <div class="mode-name">vs Bot</div>
+            <div class="mode-desc">instant match</div>
+          </div>
+        </div>
+      </div>
+      <button class="btn btn-primary" onclick="startFlow()" style="width:100%;max-width:340px">PLAY NOW</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ GENRE SELECT ══ -->
+<div id="genre" class="screen">
+  <div class="genre-inner">
+    <div class="section-title">Choose Genre</div>
+    <p class="section-sub">Pick the category you want to guess logos from.</p>
+    <div class="genre-grid" id="genreGrid"></div>
+    <div class="genre-actions">
+      <div class="genre-status">Selected: <strong id="genreSelected">None</strong></div>
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-ghost" onclick="showScreen('home')">Back</button>
+        <button class="btn btn-primary" onclick="confirmGenre()">FIND MATCH</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MATCHMAKING ══ -->
+<div id="matchmaking" class="screen">
+  <div class="mm-inner">
+    <div class="mm-spinner"></div>
+    <div class="mm-title">Finding Match</div>
+    <p class="mm-sub">Searching for a player in <strong id="mmGenreLabel">—</strong></p>
+    <div class="mm-timer" id="mmTimer">0:00</div>
+    <div class="mm-players">
+      <div class="mm-player" style="color:var(--player1)" id="mmYouName">—</div>
+      <div class="mm-vs">VS</div>
+      <div class="mm-player" style="color:var(--muted)" id="mmOppSlot">???</div>
+    </div>
+    <div class="mm-bot-hint" id="mmBotHint" style="display:none">
+      <strong>⚡ Bot joining soon…</strong><br>No real player found after 10s. A bot opponent will jump in!
+    </div>
+    <button class="btn btn-ghost" onclick="cancelMatchmaking()" style="margin-top:20px">Cancel</button>
+  </div>
+</div>
+
+<!-- ══ VERSUS SPLASH ══ -->
+<div id="versus" class="screen">
+  <div class="vs-inner">
+    <div class="vs-genre-badge" id="vsGenreBadge">Genre: —</div>
+    <div class="vs-players">
+      <div class="vs-player-card p1">
+        <div class="vs-avatar" id="vsP1Avatar">🧑</div>
+        <div class="vs-pname" id="vsP1Name">Player 1</div>
+        <div class="vs-badge"><span class="tag tag-green">YOU</span></div>
+      </div>
+      <div>
+        <div class="vs-big">VS</div>
+      </div>
+      <div class="vs-player-card p2">
+        <div class="vs-avatar" id="vsP2Avatar">👤</div>
+        <div class="vs-pname" id="vsP2Name">Player 2</div>
+        <div class="vs-badge" id="vsP2Badge"><span class="tag tag-red">OPPONENT</span></div>
+      </div>
+    </div>
+    <div class="vs-countdown" id="vsCountdown">Starting in 3…</div>
+  </div>
+</div>
+
+<!-- ══ GAME ══ -->
+<div id="game" class="screen">
+  <div class="game-header">
+    <div class="game-players">
+      <div class="gp">
+        <div class="gp-name p1" id="ghP1Name">You</div>
+        <div class="gp-status" id="ghP1Status">Guessing…</div>
+      </div>
+      <div style="color:var(--border);font-size:1.2rem">|</div>
+      <div class="gp">
+        <div class="gp-name p2" id="ghP2Name">Opponent</div>
+        <div class="gp-status" id="ghP2Status">Thinking…</div>
+      </div>
+    </div>
+    <div class="game-center-info">
+      <div class="genre-label" id="ghGenre">GENRE</div>
+      <div class="round-label" id="ghRound">Logo 1 of 10</div>
+    </div>
+    <div class="game-timer-zone">
+      <div class="timer-bar-wrap"><div class="timer-bar" id="timerBar"></div></div>
+      <div class="timer-val" id="timerVal">60</div>
+    </div>
+  </div>
+  <div class="game-body">
+    <div class="score-board">
+      <div class="score-item">
+        <div class="score-num p1" id="scoreP1">0</div>
+        <div class="score-lbl" id="scoreLblP1">You</div>
+      </div>
+      <div class="score-item" style="background:transparent;border:none;display:flex;align-items:center">
+        <span style="font-family:'Bebas Neue';font-size:1.2rem;color:var(--muted)">VS</span>
+      </div>
+      <div class="score-item">
+        <div class="score-num p2" id="scoreP2">0</div>
+        <div class="score-lbl" id="scoreLblP2">Opponent</div>
+      </div>
+    </div>
+    <div class="logo-display">
+      <div class="logo-pass-count" id="logoPassCount">🎲 Passes: 1</div>
+      <div class="logo-genre-tag"><span class="tag tag-yellow" id="logoGenreTag">TECH</span></div>
+      <div id="logoRender" class="logo-text-render">?</div>
+    </div>
+    <div class="guess-zone">
+      <div class="guess-input-wrap">
+        <input type="text" class="guess-input" id="guessInput" placeholder="Type the brand name…" autocomplete="off" maxlength="40"/>
+        <button class="btn-submit" onclick="submitGuess()">GUESS</button>
+      </div>
+      <div class="guess-actions">
+        <button class="btn-pass" id="passBtn" onclick="usePass()">🎲 Pass (1 left)</button>
+        <div class="hint-text" id="hintText">___ (? letters)</div>
+      </div>
+    </div>
+    <div class="opponent-status">
+      <div class="opp-dot" id="oppDot"></div>
+      <span id="oppStatusText">Opponent is thinking…</span>
+    </div>
+  </div>
+</div>
+
+<!-- ══ RESULT ══ -->
+<div id="result" class="screen">
+  <div class="result-inner">
+    <div class="result-crown" id="resultCrown">🏆</div>
+    <div class="result-title" id="resultTitle">YOU WIN!</div>
+    <div class="result-reason" id="resultReason">Opponent ran out of time</div>
+    <div class="result-scores">
+      <div class="rs-card">
+        <div class="rs-name" id="rsNameP1">You</div>
+        <div class="rs-score p1" id="rsScoreP1">0</div>
+      </div>
+      <div class="rs-card">
+        <div class="rs-name" id="rsNameP2">Opponent</div>
+        <div class="rs-score p2" id="rsScoreP2">0</div>
+      </div>
+    </div>
+    <div class="result-actions">
+      <button class="btn btn-primary" onclick="playAgain()">PLAY AGAIN</button>
+      <button class="btn btn-ghost" onclick="showScreen('home')">Home</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════
+//  DATA
+// ══════════════════════════════════════════════
+const GENRES = [
+  { id:'tech',    name:'Tech & Software',  icon:'💻', count:48, locked:false },
+  { id:'food',    name:'Food & Drinks',    icon:'🍔', count:42, locked:false },
+  { id:'auto',    name:'Automotive',       icon:'🚗', count:36, locked:false },
+  { id:'fashion', name:'Fashion & Luxury', icon:'👗', count:38, locked:false },
+  { id:'sports',  name:'Sports & Gaming',  icon:'⚽', count:40, locked:false },
+  { id:'finance', name:'Finance & Banks',  icon:'💳', count:30, locked:false },
+  { id:'media',   name:'Media & Streaming',icon:'🎬', count:28, locked:true  },
+  { id:'retail',  name:'Retail & Shopping',icon:'🛍️', count:32, locked:true  },
+  { id:'airlines',name:'Airlines & Travel',icon:'✈️', count:24, locked:true  },
+];
+
+const LOGOS = {
+  tech:    [{name:'Apple',color:'#a0a0a0',symbol:'🍎'},{name:'Google',color:'#4285F4',symbol:'G'},{name:'Microsoft',color:'#00A4EF',symbol:'⊞'},{name:'Amazon',color:'#FF9900',symbol:'📦'},{name:'Netflix',color:'#E50914',symbol:'N'},{name:'Spotify',color:'#1DB954',symbol:'♪'},{name:'Twitter',color:'#1DA1F2',symbol:'🐦'},{name:'Meta',color:'#0866FF',symbol:'◉'},{name:'Samsung',color:'#1428A0',symbol:'S'},{name:'Intel',color:'#0071C5',symbol:'i'}],
+  food:    [{name:'McDonald\'s',color:'#DA291C',symbol:'M'},{name:'Starbucks',color:'#00704A',symbol:'☕'},{name:'Coca-Cola',color:'#F40009',symbol:'🥤'},{name:'Pepsi',color:'#004B93',symbol:'●'},{name:'KFC',color:'#F40027',symbol:'🍗'},{name:'Subway',color:'#009B3A',symbol:'🥖'},{name:'Domino\'s',color:'#006491',symbol:'🍕'},{name:'Burger King',color:'#EC1C24',symbol:'👑'},{name:'Red Bull',color:'#CC1E2E',symbol:'🐂'},{name:'Heinz',color:'#008542',symbol:'🍅'}],
+  auto:    [{name:'BMW',color:'#1C69D4',symbol:'◎'},{name:'Toyota',color:'#EB0A1E',symbol:'○'},{name:'Tesla',color:'#E31937',symbol:'T'},{name:'Ferrari',color:'#DC0000',symbol:'🐴'},{name:'Porsche',color:'#D5001C',symbol:'🏇'},{name:'Ford',color:'#003476',symbol:'F'},{name:'Honda',color:'#CC0000',symbol:'H'},{name:'Mercedes',color:'#00ADEF',symbol:'✦'},{name:'Audi',color:'#BB0A30',symbol:'⊚'},{name:'Lamborghini',color:'#D9B111',symbol:'🐂'}],
+  fashion: [{name:'Nike',color:'#111111',symbol:'✓'},{name:'Adidas',color:'#000000',symbol:'▲'},{name:'Gucci',color:'#1D1D1B',symbol:'GG'},{name:'Louis Vuitton',color:'#B5892A',symbol:'LV'},{name:'Chanel',color:'#000000',symbol:'CC'},{name:'Prada',color:'#000000',symbol:'P'},{name:'Versace',color:'#FFD700',symbol:'⚙'},{name:'Balenciaga',color:'#000000',symbol:'B'},{name:'Supreme',color:'#FF0000',symbol:'S'},{name:'Off-White',color:'#F5F5F0',symbol:'○'}],
+  sports:  [{name:'Puma',color:'#000000',symbol:'🐆'},{name:'Under Armour',color:'#1D1D1B',symbol:'UA'},{name:'PlayStation',color:'#003087',symbol:'△○'},{name:'Xbox',color:'#107C10',symbol:'X'},{name:'ESPN',color:'#CC0000',symbol:'E'},{name:'NBA',color:'#C9082A',symbol:'🏀'},{name:'FIFA',color:'#326295',symbol:'⚽'},{name:'Red Bull Racing',color:'#1E1E1C',symbol:'🏎'},{name:'New Era',color:'#003b77',symbol:'NE'},{name:'Callaway',color:'#005A9C',symbol:'⛳'}],
+  finance: [{name:'Visa',color:'#1A1F71',symbol:'VISA'},{name:'Mastercard',color:'#EB001B',symbol:'◎'},{name:'PayPal',color:'#003087',symbol:'P'},{name:'American Express',color:'#007BC1',symbol:'AmEx'},{name:'Goldman Sachs',color:'#1C3E6C',symbol:'GS'},{name:'HSBC',color:'#DB0011',symbol:'▲'},{name:'Stripe',color:'#6772E5',symbol:'S'},{name:'Binance',color:'#F0B90B',symbol:'◈'},{name:'JPMorgan',color:'#005B99',symbol:'J'},{name:'Revolut',color:'#0075EB',symbol:'R'}],
+};
+
+// ══ BOTS ══
+const BOT_TYPES = [
+  { id:'rookie',    label:'Rookie',    difficulty:'easy',   responseRange:[8,18], passChance:.05, mistakeChance:.35, style:'hesitant',    emoji:'🐣', description:'Slow and often wrong' },
+  { id:'casual',    label:'Casual',    difficulty:'easy',   responseRange:[6,14], passChance:.10, mistakeChance:.25, style:'relaxed',     emoji:'😊', description:'Laid-back guesser' },
+  { id:'gamer',     label:'Gamer',     difficulty:'medium', responseRange:[4,10], passChance:.15, mistakeChance:.18, style:'competitive', emoji:'🎮', description:'Knows gaming & tech logos' },
+  { id:'speedrun',  label:'Speedrun',  difficulty:'medium', responseRange:[3, 8], passChance:.20, mistakeChance:.12, style:'fast',        emoji:'⚡', description:'Rushes everything' },
+  { id:'analyst',   label:'Analyst',   difficulty:'hard',   responseRange:[2, 6], passChance:.10, mistakeChance:.06, style:'calculated',  emoji:'🧠', description:'Methodical and precise' },
+  { id:'prodigy',   label:'Prodigy',   difficulty:'hard',   responseRange:[1, 4], passChance:.08, mistakeChance:.04, style:'aggressive',  emoji:'🔥', description:'Almost unbeatable' },
+  { id:'glitched',  label:'Gl1tch3d',  difficulty:'hard',   responseRange:[1, 3], passChance:.25, mistakeChance:.02, style:'erratic',     emoji:'👾', description:'Unpredictable AI entity' },
+];
+
+const BOT_NAMES = {
+  rookie:   ['TinyGuesser','LogoNoobie','BabyBrand','NewKid99','FreshMint','GreenHorn','LilBrander','Puzzled_Pete','GuessWho_','WhoKnows01','LuckyDip','Huh_What','Ohh_Logo','Blank_Stare','NoBrand_Ned','SoftGuess','JustLearning','BrandNewbie','Random_Ray','CluelessCal'],
+  casual:   ['CozyGuesser','SundayPlayer','ChillBrander','LoungeLogo','Mellow_Mark','EasyDoes_It','NoRush_Nash','SippingTea','PillowGamer','WeekendsOnly','BreezeGuy','Relaxo_Rex','SoftPace','NoCoffeeYet','SlowBrew','HalfAsleep','CalmQuinn','MorningMode','VibeCheck_V','CasualKev'],
+  gamer:    ['Xtr3meGamer','LogoLord99','PixelHunter','GameOn_G','BrandKillerX','LvL99Logos','CtrlAltBrand','GG_EZ_Logo','RespawnBrand','HeadShotHank','FraggerFinn','ProGamer_P','NightOwlG','GrindModeOn','MetaGamer','SweatingBro','ClipIt_C','LagFreeL','BigPlayBo','LogoHunter'],
+  speedrun: ['FlashGuesser','Speedster99','Sub3Second','BlinkBrand','ZeroLag_Z','ThunderThumb','NoBrake_N','InstantWin','QuickDraw_Q','TurboTyper','WarpSpeed_W','RushHour_R','GoGoGo_G','HotKeys_H','FastFingers','OneSecondS','NanoTime_N','FasterThanU','BlazeIt_B','SonicSpeeds'],
+  analyst:  ['DataDriven_D','LogicLens_L','BrandAudit_A','StrategistX','CalcGuesser','PatternPro_P','SysAnalyst','InfoGather_I','ThinkTank_T','LogoScanner','MindMap_M','AnalystBot','KnowledgeK','FrameworkFred','ModelMike','HypothesisH','LogicTree_L','ReasonBot_R','ColdLogic_C','BlueprintB'],
+  prodigy:  ['LogoSavant','BrandGenius','GuessGod_G','ProdigyX99','UltraVision','EliteBrander','MasterMind_M','Logo_Oracle','BrandWhiz_W','TopTier_T','PurePrecision','LogoAlpha_A','NoMiss_N','PerfectEye_P','CrispGuess','SharpShooter','FlawlessF','BrandProX','InfallibleI','LogoMaximum'],
+  glitched: ['Gl1tch3d_G','3rr0r_Bot','NullPtr_N','404_Brain','Inf1n1ty_I','Rec0rs1on_R','Deadlock_D','SegFault_S','StackOvfl','H3xDump_H','ByteGlitch','Kernel_K','CRASHbot99','Overfl0w_O','MemLeak_M','Zer0Day_Z','BitFlip_B','SyntaxErr','UndefinedU','VoidPtr_V'],
+};
+
+// ══════════════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════════════
+let state = {
+  playerName: '',
+  opponentName: '',
+  opponentIsBot: false,
+  botType: null,
+  gameMode: 'online', // 'online'|'bot'
+  selectedGenre: null,
+  logos: [],
+  currentLogoIdx: 0,
+  passesLeft: 1,
+  passedThisRound: false,
+  playerScore: 0,
+  opponentScore: 0,
+  timeLeft: 60,
+  timerInterval: null,
+  mmInterval: null,
+  mmSeconds: 0,
+  vsCountdown: null,
+  botThinkTimeout: null,
+  gameOver: false,
+  round: 0,
+  maxRounds: 10,
+  oppGuessInterval: null,
+};
+
+// ══════════════════════════════════════════════
+//  HELPERS
+// ══════════════════════════════════════════════
+function showScreen(id){ document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active')); document.getElementById(id).classList.add('active'); }
+function rand(a,b){ return Math.floor(Math.random()*(b-a+1))+a; }
+function pick(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+function toast(msg, type='info'){
+  const t=document.createElement('div'); t.className=`toast ${type}`; t.textContent=msg; document.body.appendChild(t);
+  setTimeout(()=>t.remove(),2200);
+}
+function flash(type){ const d=document.createElement('div'); d.className=`${type}-flash`; document.body.appendChild(d); setTimeout(()=>d.remove(),500); }
+function normalize(s){ return s.toLowerCase().replace(/[^a-z0-9]/g,''); }
+function shuffle(arr){ return [...arr].sort(()=>Math.random()-.5); }
+
+// ══════════════════════════════════════════════
+//  HOME
+// ══════════════════════════════════════════════
+function selectMode(m){
+  state.gameMode=m;
+  document.getElementById('modeOnline').classList.toggle('selected',m==='online');
+  document.getElementById('modeBot').classList.toggle('selected',m==='bot');
+}
+function startFlow(){
+  const n=document.getElementById('playerNameInput').value.trim();
+  if(!n){ toast('Enter a username first!','error'); return; }
+  state.playerName=n;
+  buildGenreGrid();
+  showScreen('genre');
+}
+
+// ══════════════════════════════════════════════
+//  GENRE
+// ══════════════════════════════════════════════
+function buildGenreGrid(){
+  const g=document.getElementById('genreGrid'); g.innerHTML='';
+  GENRES.forEach(genre=>{
+    const c=document.createElement('div');
+    c.className='genre-card'+(genre.locked?' locked':'');
+    c.innerHTML=`
+      <span class="genre-icon">${genre.icon}</span>
+      <div class="genre-name">${genre.name}</div>
+      <div class="genre-count">${genre.count} logos</div>
+      ${genre.locked?'<span class="genre-lock">🔒</span>':''}`;
+    if(!genre.locked) c.onclick=()=>selectGenre(genre.id, c, genre.name);
+    g.appendChild(c);
+  });
+}
+function selectGenre(id, card, name){
+  document.querySelectorAll('.genre-card').forEach(c=>c.classList.remove('selected'));
+  card.classList.add('selected');
+  state.selectedGenre=id;
+  document.getElementById('genreSelected').textContent=name;
+}
+function confirmGenre(){
+  if(!state.selectedGenre){ toast('Pick a genre first!','error'); return; }
+  startMatchmaking();
+}
+
+// ══════════════════════════════════════════════
+//  MATCHMAKING
+// ══════════════════════════════════════════════
+function startMatchmaking(){
+  showScreen('matchmaking');
+  const genre=GENRES.find(g=>g.id===state.selectedGenre);
+  document.getElementById('mmGenreLabel').textContent=genre.name;
+  document.getElementById('mmYouName').textContent=state.playerName;
+  document.getElementById('mmOppSlot').textContent='???';
+  document.getElementById('mmBotHint').style.display='none';
+  state.mmSeconds=0;
+  if(state.mmInterval) clearInterval(state.mmInterval);
+
+  state.mmInterval=setInterval(()=>{
+    state.mmSeconds++;
+    const m=String(Math.floor(state.mmSeconds/60)).padStart(1,'0');
+    const s=String(state.mmSeconds%60).padStart(2,'0');
+    document.getElementById('mmTimer').textContent=`${m}:${s}`;
+    if(state.mmSeconds===10) document.getElementById('mmBotHint').style.display='block';
+    if(state.mmSeconds>=10 || state.gameMode==='bot'){
+      if(state.mmSeconds>=10 || state.gameMode==='bot'){
+        clearInterval(state.mmInterval);
+        assignBotOpponent();
+      }
+    }
+  },1000);
+  if(state.gameMode==='bot'){ clearInterval(state.mmInterval); setTimeout(assignBotOpponent,1200); }
+}
+function cancelMatchmaking(){
+  clearInterval(state.mmInterval);
+  showScreen('genre');
+}
+function assignBotOpponent(){
+  clearInterval(state.mmInterval);
+  const bot=pick(BOT_TYPES);
+  const names=BOT_NAMES[bot.id];
+  state.botType=bot;
+  state.opponentIsBot=true;
+  state.opponentName=pick(names)+' 🤖';
+  document.getElementById('mmOppSlot').textContent=state.opponentName;
+  document.getElementById('mmOppSlot').style.color='var(--accent2)';
+  toast(`Bot found: ${state.opponentName} (${bot.label})`, 'info');
+  setTimeout(launchVersus, 1000);
+}
+
+// ══════════════════════════════════════════════
+//  VERSUS SPLASH
+// ══════════════════════════════════════════════
+function launchVersus(){
+  const genre=GENRES.find(g=>g.id===state.selectedGenre);
+  document.getElementById('vsGenreBadge').textContent=`GENRE: ${genre.name.toUpperCase()}`;
+  document.getElementById('vsP1Name').textContent=state.playerName;
+  document.getElementById('vsP2Name').textContent=state.opponentName;
+  document.getElementById('vsP2Avatar').textContent=state.opponentIsBot?'🤖':'👤';
+  if(state.opponentIsBot){
+    const bot=state.botType;
+    document.getElementById('vsP2Badge').innerHTML=`<span class="tag tag-${bot.difficulty==='easy'?'green':bot.difficulty==='medium'?'yellow':'red'}">${bot.emoji} ${bot.label.toUpperCase()}</span>`;
+  } else {
+    document.getElementById('vsP2Badge').innerHTML='<span class="tag tag-red">OPPONENT</span>';
+  }
+  showScreen('versus');
+  let c=3;
+  document.getElementById('vsCountdown').textContent=`Starting in ${c}…`;
+  if(state.vsCountdown) clearInterval(state.vsCountdown);
+  state.vsCountdown=setInterval(()=>{
+    c--;
+    if(c<=0){ clearInterval(state.vsCountdown); startGame(); }
+    else document.getElementById('vsCountdown').textContent=`Starting in ${c}…`;
+  },1000);
+}
+
+// ══════════════════════════════════════════════
+//  GAME
+// ══════════════════════════════════════════════
+function startGame(){
+  const logoPool=shuffle(LOGOS[state.selectedGenre]||LOGOS.tech);
+  state.logos=logoPool.slice(0,state.maxRounds);
+  state.currentLogoIdx=0;
+  state.passesLeft=1;
+  state.playerScore=0;
+  state.opponentScore=0;
+  state.timeLeft=60;
+  state.gameOver=false;
+  state.round=0;
+  
+  // Header names
+  document.getElementById('ghP1Name').textContent=state.playerName;
+  document.getElementById('ghP2Name').textContent=state.opponentName;
+  document.getElementById('scoreLblP1').textContent=state.playerName.substring(0,10);
+  document.getElementById('scoreLblP2').textContent=state.opponentName.substring(0,10).replace(' 🤖','');
+  document.getElementById('rsNameP1').textContent=state.playerName;
+  document.getElementById('rsNameP2').textContent=state.opponentName;
+
+  const genre=GENRES.find(g=>g.id===state.selectedGenre);
+  document.getElementById('ghGenre').textContent=genre.name.toUpperCase();
+  document.getElementById('logoGenreTag').textContent=genre.name.split(' ')[0].toUpperCase();
+
+  showScreen('game');
+  loadLogo();
+  startTimer();
+  if(state.opponentIsBot) scheduleBotGuess();
+}
+
+function loadLogo(){
+  if(state.currentLogoIdx>=state.logos.length){ endGame('completed'); return; }
+  const logo=state.logos[state.currentLogoIdx];
+  state.passedThisRound=false;
+  state.round=state.currentLogoIdx+1;
+
+  document.getElementById('ghRound').textContent=`Logo ${state.round} of ${state.maxRounds}`;
+  document.getElementById('passBtn').textContent=`🎲 Pass (${state.passesLeft} left)`;
+  document.getElementById('passBtn').disabled=state.passesLeft<=0;
+
+  // Render logo as styled text block
+  const render=document.getElementById('logoRender');
+  render.textContent=logo.symbol;
+  render.style.color=logo.color;
+  render.style.textShadow=`0 0 40px ${logo.color}55`;
+
+  // Hint: show letter count
+  const blanks=Array(logo.name.length).fill('_').join(' ');
+  document.getElementById('hintText').textContent=`${blanks} (${logo.name.length} letters)`;
+
+  const gi=document.getElementById('guessInput');
+  gi.value=''; gi.className='guess-input'; gi.focus();
+
+  updateOpponentStatus();
+  updateScoreBoard();
+  if(state.opponentIsBot) scheduleBotGuess();
+}
+
+function startTimer(){
+  state.timeLeft=60;
+  if(state.timerInterval) clearInterval(state.timerInterval);
+  updateTimerUI();
+  state.timerInterval=setInterval(()=>{
+    state.timeLeft--;
+    updateTimerUI();
+    if(state.timeLeft<=0){ clearInterval(state.timerInterval); endGame('timeout_player'); }
+  },1000);
+}
+function updateTimerUI(){
+  const bar=document.getElementById('timerBar');
+  const val=document.getElementById('timerVal');
+  bar.style.width=(state.timeLeft/60*100)+'%';
+  bar.style.background=state.timeLeft<=10?'var(--accent2)':state.timeLeft<=20?'#f5a020':'var(--accent)';
+  val.textContent=state.timeLeft;
+  val.className='timer-val'+(state.timeLeft<=10?' urgent':'');
+}
+
+function submitGuess(){
+  if(state.gameOver) return;
+  const inp=document.getElementById('guessInput');
+  const guess=inp.value.trim();
+  if(!guess) return;
+  const logo=state.logos[state.currentLogoIdx];
+  if(normalize(guess)===normalize(logo.name)){
+    flash('correct');
+    inp.className='guess-input correct';
+    toast(`✅ Correct! +1 point`,'success');
+    state.playerScore++;
+    updateScoreBoard();
+    document.getElementById('ghP1Status').textContent=`✓ Guessed!`;
+    cancelBotTimeout();
+    setTimeout(()=>{ state.currentLogoIdx++; loadLogo(); },700);
+  } else {
+    flash('wrong');
+    inp.className='guess-input wrong';
+    toast(`❌ Wrong! Try again`,'error');
+    setTimeout(()=>{ inp.className='guess-input'; inp.value=''; inp.focus(); },400);
+  }
+}
+
+function usePass(){
+  if(state.passesLeft<=0||state.passedThisRound) return;
+  state.passesLeft=0;
+  state.passedThisRound=true;
+  document.getElementById('passBtn').disabled=true;
+  document.getElementById('passBtn').textContent='🎲 Pass (0 left)';
+  toast('⏩ Skipped to next logo — takes 5s!','info');
+  cancelBotTimeout();
+  state.timeLeft=Math.max(1,state.timeLeft-5); // pass costs 5 seconds
+  updateTimerUI();
+  setTimeout(()=>{ state.currentLogoIdx++; loadLogo(); },600);
+}
+
+document.addEventListener('keydown',e=>{ if(e.key==='Enter'&&document.getElementById('game').classList.contains('active')) submitGuess(); });
+
+// ══════════════════════════════════════════════
+//  BOT AI
+// ══════════════════════════════════════════════
+function cancelBotTimeout(){ if(state.botThinkTimeout){ clearTimeout(state.botThinkTimeout); state.botThinkTimeout=null; } }
+function scheduleBotGuess(){
+  cancelBotTimeout();
+  if(!state.opponentIsBot||state.gameOver||state.currentLogoIdx>=state.logos.length) return;
+  const bot=state.botType;
+  const logo=state.logos[state.currentLogoIdx];
+  const [min,max]=bot.responseRange;
+  const delay=rand(min,max)*1000;
+
+  state.botThinkTimeout=setTimeout(()=>{
+    if(state.gameOver) return;
+    const correct=Math.random()>bot.mistakeChance;
+    document.getElementById('oppDot').className='opp-dot typing';
+    document.getElementById('oppStatusText').textContent=`${state.opponentName.replace(' 🤖','')} is typing…`;
+    setTimeout(()=>{
+      if(correct){
+        state.opponentScore++;
+        updateScoreBoard();
+        document.getElementById('ghP2Status').textContent=`✓ Guessed it!`;
+        document.getElementById('oppDot').className='opp-dot';
+        document.getElementById('oppStatusText').textContent=`${state.opponentName.replace(' 🤖','')} guessed correctly!`;
+        toast(`🤖 Bot guessed: ${logo.name}!`,'info');
+        if(state.opponentScore>state.playerScore+4){ setTimeout(()=>endGame('timeout_player'),800); return; }
+        if(state.opponentScore>=state.maxRounds){ endGame('bot_finished'); return; }
+        // wait for player or advance after delay
+        setTimeout(()=>{
+          if(!state.gameOver){ state.currentLogoIdx++; loadLogo(); }
+        },2200);
+      } else {
+        document.getElementById('oppDot').className='opp-dot';
+        document.getElementById('oppStatusText').textContent=`${state.opponentName.replace(' 🤖','')} guessed wrong…`;
+        scheduleBotGuess(); // try again
+      }
+    },rand(400,900));
+  },delay);
+}
+
+function updateOpponentStatus(){
+  document.getElementById('ghP1Status').textContent='Guessing…';
+  document.getElementById('ghP2Status').textContent='Thinking…';
+  document.getElementById('oppDot').className='opp-dot';
+  document.getElementById('oppStatusText').textContent=`${state.opponentName.replace(' 🤖','')} is thinking…`;
+}
+function updateScoreBoard(){
+  document.getElementById('scoreP1').textContent=state.playerScore;
+  document.getElementById('scoreP2').textContent=state.opponentScore;
+}
+
+// ══════════════════════════════════════════════
+//  END GAME
+// ══════════════════════════════════════════════
+function endGame(reason){
+  if(state.gameOver) return;
+  state.gameOver=true;
+  clearInterval(state.timerInterval);
+  cancelBotTimeout();
+
+  const pWins=state.playerScore>state.opponentScore;
+  const tie=state.playerScore===state.opponentScore;
+  let title,reasonText,crown;
+
+  if(reason==='timeout_player'){
+    title=`<span class="result-loser">TIME'S UP!</span>`;
+    reasonText=`You ran out of time. Better luck next round!`;
+    crown='⏰';
+  } else if(reason==='bot_finished'){
+    title=`<span class="result-loser">BOT WINS!</span>`;
+    reasonText=`The bot finished faster than you!`;
+    crown='🤖';
+  } else if(tie){
+    title=`<span style="color:var(--accent)">IT'S A TIE!</span>`;
+    reasonText='Both players scored the same. Incredible!';
+    crown='🤝';
+  } else if(pWins){
+    title=`<span class="result-winner">YOU WIN!</span>`;
+    reasonText=reason==='completed'?'You outscored your opponent!':'Outstanding performance!';
+    crown='🏆';
+  } else {
+    title=`<span class="result-loser">YOU LOSE!</span>`;
+    reasonText='Opponent scored higher this round.';
+    crown='😤';
+  }
+
+  document.getElementById('resultCrown').textContent=crown;
+  document.getElementById('resultTitle').innerHTML=title;
+  document.getElementById('resultReason').textContent=reasonText;
+  document.getElementById('rsScoreP1').textContent=state.playerScore;
+  document.getElementById('rsScoreP2').textContent=state.opponentScore;
+
+  setTimeout(()=>showScreen('result'),400);
+}
+
+function playAgain(){
+  clearInterval(state.timerInterval);
+  cancelBotTimeout();
+  state.opponentIsBot=false;
+  state.botType=null;
+  state.selectedGenre=null;
+  state.gameOver=false;
+  buildGenreGrid();
+  showScreen('genre');
+}
+</script>
+</body>
+</html>
